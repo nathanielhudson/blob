@@ -39,6 +39,30 @@ class Stage {
     var blob = new Blob(x, this.gridHeight, color, this);
     blob.instantDrop();
   }
+  dropAll() {
+    for (var x = 0; x < this.grid.length; x++) {
+      for (var y = 0; y < this.grid[x].length; y++) {
+        var cell = this.grid[x][y];
+        if (cell) {
+          this.grid[x][y] = null;
+          cell.instantDrop();
+        }//if
+      }//for
+    }//for
+  }
+  burst() {
+    var count = 0;
+    for (var x = 0; x < this.grid.length; x++) {
+      for (var y = 0; y < this.grid[x].length; y++) {
+        var cell = this.grid[x][y];
+        if (cell && cell.color != "grey" && cell.linked >= 4) {
+          cell.destroyConnected();
+          count++;
+        }//if
+      }//for
+    }//for
+    return count;
+  }
   linkCells() {
     for (var x = 0; x < this.grid.length; x++) {
       for (var y = 0; y < this.grid[x].length; y++) {
@@ -53,8 +77,18 @@ class Stage {
         }//if
       }//for
     }//for
+    for (var x = 0; x < this.grid.length; x++) {
+      for (var y = 0; y < this.grid[x].length; y++) {
+        var cell = this.grid[x][y];
+        if (cell) {
+          cell.countLinks();
+        }//if
+      }//for
+    }//for
   }
 }
+
+
 
 class Blob {
   constructor(x, y, color, stage) {
@@ -70,26 +104,48 @@ class Blob {
       right: false
     };
   }
-  countLinks(sum) {
+  countLinks(count = {sum: 0}) {
     if (this.linksCounted) {
-      return 0;
+      return this.linked;
     }
     this.linksCounted = true;
-    
+    count.sum++;
     if (this.links.up) {
-      this.stage.grid[this.pos.x][this.pos.y+1].countLinks(sum);
+      this.stage.grid[this.pos.x][this.pos.y+1].countLinks(count);
     }
     if (this.links.down) {
-      this.stage.grid[this.pos.x][this.pos.y-1].countLinks(sum);
+      this.stage.grid[this.pos.x][this.pos.y-1].countLinks(count);
     }
     if (this.links.left) {
-      this.stage.grid[this.pos.x-1][this.pos.y].countLinks(sum);
+      this.stage.grid[this.pos.x-1][this.pos.y].countLinks(count);
     }
     if (this.links.right) {
-      this.stage.grid[this.pos.x+1][this.pos.y].countLinks(sum);
+      this.stage.grid[this.pos.x+1][this.pos.y].countLinks(count);
     }
-    this.linked = sum;
-    return sum;
+    this.linked = count.sum;
+    return this.linked;
+  }
+  destroy() {
+    if (this.stage.grid[this.pos.x][this.pos.y] == this) {
+      this.stage.grid[this.pos.x][this.pos.y] = null;
+    } else {
+      console.error("Destroy failed?");
+    }
+  }
+  destroyConnected() {
+    this.destroy();
+    if (this.links.up && this.stage.grid[this.pos.x][this.pos.y+1]) {
+      this.stage.grid[this.pos.x][this.pos.y+1].destroyConnected();
+    }
+    if (this.links.down && this.stage.grid[this.pos.x][this.pos.y-1]) {
+      this.stage.grid[this.pos.x][this.pos.y-1].destroyConnected();
+    }
+    if (this.links.left && this.stage.grid[this.pos.x-1][this.pos.y]) {
+      this.stage.grid[this.pos.x-1][this.pos.y].destroyConnected();
+    }
+    if (this.links.right && this.stage.grid[this.pos.x+1][this.pos.y]) {
+      this.stage.grid[this.pos.x+1][this.pos.y].destroyConnected();
+    }
   }
   snap() {
     this.pos.x = Math.floor(this.pos.x);
@@ -109,7 +165,7 @@ class Blob {
     //COULDN'T freeze
     this.stage.fail()
   }
-  instantDrop() { //mostly a test fcn?
+  instantDrop() {
     this.snap();
     for (; this.pos.y >= 0; this.pos.y--) {
       if (this.stage.grid[this.pos.x][this.pos.y-1] !== null) {
@@ -119,7 +175,7 @@ class Blob {
       }
     }
     console.error("drop failed!");
-    console.error(this);
+    this.destroy()
   }
   update() {
 
@@ -170,19 +226,27 @@ class Blob {
 }
 
 var stage = new Stage();
-for (var i = 0; i < 5; i++) {
-  stage.spawnFallingCell(Math.random()*6, "red");
+for (var j = 0; j < 4; j++) {
+  for (var i = 0; i < 3; i++) {
+    stage.spawnFallingCell(Math.random()*6, "red");
+  }
+  for (var i = 0; i < 3; i++) {
+    stage.spawnFallingCell(Math.random()*6, "green");
+  }
+  for (var i = 0; i < 3; i++) {
+    stage.spawnFallingCell(Math.random()*6, "blue");
+  }
 }
-for (var i = 0; i < 5; i++) {
-  stage.spawnFallingCell(Math.random()*6, "red");
+while (true) {
+  stage.linkCells();
+  if (stage.burst()) {
+    stage.dropAll();
+  } else {
+    break;
+  }
 }
-for (var i = 0; i < 5; i++) {
-  stage.spawnFallingCell(Math.random()*6, "green");
-}
-for (var i = 0; i < 5; i++) {
-  stage.spawnFallingCell(Math.random()*6, "blue");
-}
-console.log(stage.grid[0][0].countLinks(0));
-stage.linkCells();
+
+//console.log(stage.grid[0][0].countLinks());
+//console.log(stage.grid[0][0].destroyConnected());
 stage.render();
 console.log(stage);
